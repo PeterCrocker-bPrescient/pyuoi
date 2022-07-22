@@ -226,6 +226,8 @@ class UoI_Lasso(AbstractUoILinearRegressor, LinearRegression):
         self.eps = eps
         self.solver = solver
         self.tol = tol
+        self.copy_X = copy_X
+        self.warm_start = warm_start
 
         if solver == 'cd':
             self._selection_lm = Lasso(

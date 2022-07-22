@@ -15,8 +15,26 @@ from pyuoi.mpi_utils import Gatherv_rows, Bcast_from_root
 from .utils import stability_selection_to_threshold, intersection
 from ..utils import check_logger
 
+import pickle
+
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.utils.multiclass import type_of_target
+
+
+def is_picklable(obj):
+    try:
+        pickle.dumps(obj)
+        return True
+    except:
+        return False
+
+class Unpicklable():
+    def __init__(self, obj_str):
+        self.obj_str = obj_str
+    def __str__(self):
+        return self.obj_str
+    def __repr__(self):
+        return f'Unpicklable(obj_str={self.obj_str!r})'
 
 
 class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
@@ -97,7 +115,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         shared_support=True,
         max_iter=None,
         tol=None,
-        random_state=None,
+        random_state=42,
         comm=None,
         logger=None,
     ):
@@ -116,17 +134,17 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         self.tol = tol
         self.comm = comm
         # preprocessing
-        if isinstance(random_state, int):
-            # make sure ranks use different seed
-            if self.comm is not None:
-                random_state += self.comm.rank
-            self.random_state = np.random.RandomState(random_state)
-        else:
-            if random_state is None:
-                self.random_state = np.random
-            else:
-                self.random_state = random_state
-
+        # if isinstance(random_state, int):
+        #     # make sure ranks use different seed
+        #     if self.comm is not None:
+        #         random_state += self.comm.rank
+        #     #self.random_state = np.random.RandomState(random_state)
+        # else:
+        #     if random_state is None:
+        #         self.random_state = np.random
+        #     else:
+        #         self.random_state = random_state
+        self.random_state = random_state
         # extract selection thresholds from user provided stability selection
         self.selection_thresholds_ = stability_selection_to_threshold(
             self.stability_selection, self.n_boots_sel
@@ -134,7 +152,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
 
         self.n_supports_ = None
 
-        self._logger = check_logger(logger, "uoi_linear_model", self.comm)
+        self.logger = check_logger(logger, "uoi_linear_model", self.comm)
 
     @_abc.abstractproperty
     def estimation_score(self):
@@ -175,7 +193,6 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         if self.standardize:
             sX = self._X_scaler
             self.coef_ /= sX.scale_[np.newaxis]
-
     @_abc.abstractmethod
     def _fit_intercept(self, X, y):
         """Fit a model with an intercept and fixed coefficients.
@@ -214,9 +231,9 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             displaying progress.
         """
         if verbose:
-            self._logger.setLevel(logging.DEBUG)
+            self.logger.setLevel(logging.DEBUG)
         else:
-            self._logger.setLevel(logging.WARNING)
+            self.logger.setLevel(logging.WARNING)
 
         X, y = self._pre_fit(X, y)
 
@@ -324,10 +341,10 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
                     "selection bootstrap %d, "
                     "regularization parameter set %d" % (boot_idx, reg_idx)
                 )
-                self._logger.info(msg)
+                self.logger.info(msg)
 
             else:
-                self._logger.info("selection bootstrap %d" % (boot_idx))
+                self.logger.info("selection bootstrap %d" % (boot_idx))
             selection_coefs[ii] = np.squeeze(
                 self.uoi_selection_sweep(X_rep, y_rep, my_reg_params)
             )
@@ -356,7 +373,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         self.n_supports_ = self.supports_.shape[0]
 
         if rank == 0:
-            self._logger.info("Found %d supports" % self.n_supports_)
+            self.logger.info("Found %d supports" % self.n_supports_)
 
         #####################
         # Estimation Module #
@@ -411,7 +428,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
                 oversample = RandomOverSampler()
                 X_rep, y_rep = oversample.fit_resample(X_rep, y_rep)
 
-            self._logger.info(
+            self.logger.info(
                 "estimation bootstrap %d, support %d" % (boot_idx, support_idx)
             )
             if np.any(support):
@@ -541,6 +558,19 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         """
         return X.shape[1] * self.output_dim
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        for key, val in state.items():
+            if not is_picklable(val):
+                state[key] = Unpicklable(str(val))
+        return state
+    
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+
+
+
 
 class AbstractUoILinearRegressor(
     AbstractUoILinearModel, metaclass=_abc.ABCMeta
@@ -593,16 +623,17 @@ class AbstractUoILinearRegressor(
 
         self.__estimation_score = estimation_score
 
-        if estimation_target is not None:
-            if estimation_target not in ["train", "test"]:
-                raise ValueError(
-                    "invalid estimation target: %s" % estimation_target
-                )
+        if estimation_target not in list(self._train_test_map.values()):
+            if estimation_target is not None:
+                if estimation_target not in list(self._train_test_map.keys()):
+                    raise ValueError(
+                        "invalid estimation target: %s" % estimation_target
+                    )
+                else:
+                    estimation_target = self._train_test_map[estimation_target]
             else:
-                estimation_target = self._train_test_map[estimation_target]
-        else:
-            estimation_target = self._default_est_targets[estimation_score]
-        self._estimation_target = estimation_target
+                estimation_target = self._default_est_targets[estimation_score]
+        self.estimation_target = estimation_target
 
     def _pre_fit(self, X, y):
         X, y = super()._pre_fit(X, y)
@@ -678,8 +709,8 @@ class AbstractUoILinearRegressor(
         """
 
         # Select the data relevant for the estimation_score
-        X = X[boot_idxs[self._estimation_target]]
-        y = y[boot_idxs[self._estimation_target]]
+        X = X[boot_idxs[self.estimation_target]]
+        y = y[boot_idxs[self.estimation_target]]
 
         if y.ndim == 2:
             if y.shape[1] > 1:
@@ -796,17 +827,18 @@ class AbstractUoIGeneralizedLinearRegressor(
             )
         self.__estimation_score = estimation_score
 
-        if estimation_target is not None:
-            if estimation_target not in ["train", "test"]:
-                raise ValueError(
-                    "invalid estimation target: %s" % estimation_target
-                )
+        if estimation_target not in list(self._train_test_map.values()):
+            if estimation_target is not None:
+                if estimation_target not in list(self._train_test_map.keys()):
+                    raise ValueError(
+                        "invalid estimation target: %s" % estimation_target
+                    )
+                else:
+                    estimation_target = self._train_test_map[estimation_target]
             else:
-                estimation_target = self._train_test_map[estimation_target]
-        else:
-            estimation_target = self._default_est_targets[estimation_score]
+                estimation_target = self._default_est_targets[estimation_score]
 
-        self._estimation_target = estimation_target
+        self.estimation_target = estimation_target
 
     def _post_fit(self, X, y):
         super()._post_fit(X, y)
@@ -864,8 +896,8 @@ class AbstractUoIGeneralizedLinearRegressor(
         """
 
         # Select the data relevant for the estimation_score
-        X = X[boot_idxs[self._estimation_target]]
-        y = y[boot_idxs[self._estimation_target]]
+        X = X[boot_idxs[self.estimation_target]]
+        y = y[boot_idxs[self.estimation_target]]
 
         if metric == "acc":
             if self.shared_support:

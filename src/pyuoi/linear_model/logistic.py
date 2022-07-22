@@ -135,6 +135,8 @@ class UoI_L1Logistic(AbstractUoIGeneralizedLinearRegressor, LogisticRegression):
         self.eps = eps
         self.tol = tol
         self.solver = 'lbfgs'
+        self.warm_start = warm_start
+        self.max_iter = max_iter
         self._selection_lm = MaskedCoefLogisticRegression(
             penalty='l1',
             max_iter=max_iter,
@@ -426,7 +428,6 @@ class MaskedCoefLogisticRegression(LogisticRegression):
         self.coef_ = np.asarray(fold_coefs_)
         self.coef_ = self.coef_.reshape(n_classes, n_features +
                                         int(self.fit_intercept))
-
         if self.fit_intercept:
             self.intercept_ = self.coef_[:, -1]
             self.coef_ = self.coef_[:, :-1]
