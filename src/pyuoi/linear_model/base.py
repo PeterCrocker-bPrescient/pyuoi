@@ -332,7 +332,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             y_rep = y[idxs_train]
 
             if type_of_target(y_rep) in {"multiclass", "binary"}:
-                oversample = RandomOverSampler()
+                oversample = RandomOverSampler(random_state = self.random_state)
                 X_rep, y_rep = oversample.fit_resample(X_rep, y_rep)
 
             # fit the coefficients
@@ -425,7 +425,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             y_rep = y[idxs_train]
 
             if type_of_target(y_rep) in {"multiclass", "binary"}:
-                oversample = RandomOverSampler()
+                oversample = RandomOverSampler(random_state = self.random_state)
                 X_rep, y_rep = oversample.fit_resample(X_rep, y_rep)
 
             self.logger.info(
