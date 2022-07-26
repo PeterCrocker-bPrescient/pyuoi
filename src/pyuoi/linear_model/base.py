@@ -627,8 +627,7 @@ class AbstractUoILinearRegressor(
             if estimation_target is not None:
                 if estimation_target not in list(self._train_test_map.keys()):
                     raise ValueError(
-                        "invalid estimation target: %s" % estimation_target
-                    )
+                        "invalid estimation target: %s" % estimation_target)
                 else:
                     estimation_target = self._train_test_map[estimation_target]
             else:
