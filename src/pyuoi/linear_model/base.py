@@ -15,6 +15,9 @@ from pyuoi.mpi_utils import (Gatherv_rows, Bcast_from_root)
 from .utils import stability_selection_to_threshold, intersection
 from ..utils import check_logger
 
+from imblearn.over_sampling import RandomOverSampler
+from sklearn.utils.multiclass import type_of_target
+
 
 class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
     r"""An abstract base class for UoI ``linear_model`` classes.
@@ -50,6 +53,10 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
     standardize : bool
         If True, the regressors X will be standardized before regression by
         subtracting the mean and dividing by their standard deviations.
+    balance : bool
+        If True, the regressor will randomly resample the fitting bags as to 
+        balance the class distribution within each bag on both union and
+        interseciton steps.
     shared_support : bool
         For models with more than one output (multinomial logistic regression)
         this determines whether all outputs share the same support or can
@@ -84,7 +91,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
 
     def __init__(self, n_boots_sel=24, n_boots_est=24, selection_frac=0.9,
                  estimation_frac=0.9, stability_selection=1.,
-                 fit_intercept=True, standardize=True,
+                 fit_intercept=True, standardize=True, balance=False,
                  shared_support=True, max_iter=None, tol=None,
                  random_state=None, comm=None, logger=None):
         # data split fractions
@@ -97,6 +104,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         self.stability_selection = stability_selection
         self.fit_intercept = fit_intercept
         self.standardize = standardize
+        self.balance = balance
         self.shared_support = shared_support
         self.max_iter = max_iter
         self.tol = tol
@@ -288,6 +296,10 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             X_rep = X[idxs_train]
             y_rep = y[idxs_train]
 
+            if self.balance:
+                 oversample = RandomOverSampler(random_state=self.random_state)
+                 X_rep, y_rep = oversample.fit_resample(X_rep, y_rep)
+
             # fit the coefficients
             if size > self.n_boots_sel:
                 msg = ("selection bootstrap %d, "
@@ -368,6 +380,11 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             idxs_train, idxs_test = my_boots[boot_idx]
             X_rep = X[idxs_train]
             y_rep = y[idxs_train]
+
+            if self.balance:
+                 oversample = RandomOverSampler(random_state=self.random_state)
+                 X_rep, y_rep = oversample.fit_resample(X_rep, y_rep)
+
             self._logger.info("estimation bootstrap %d, support %d"
                               % (boot_idx, support_idx))
             if np.any(support):
@@ -680,7 +697,7 @@ class AbstractUoIGeneralizedLinearRegressor(AbstractUoILinearModel,
     def __init__(self, n_boots_sel=24, n_boots_est=24, selection_frac=0.9,
                  estimation_frac=0.9, stability_selection=1.,
                  estimation_score='acc', estimation_target=None,
-                 copy_X=True, fit_intercept=True, standardize=True,
+                 copy_X=True, fit_intercept=True, standardize=True, balance=False,
                  random_state=None, max_iter=None, tol=None,
                  shared_support=True, comm=None, logger=None):
         super(AbstractUoIGeneralizedLinearRegressor, self).__init__(
@@ -692,6 +709,7 @@ class AbstractUoIGeneralizedLinearRegressor(AbstractUoILinearModel,
             random_state=random_state,
             fit_intercept=fit_intercept,
             standardize=standardize,
+            balance=balance,
             shared_support=shared_support,
             max_iter=max_iter,
             tol=tol,

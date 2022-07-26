@@ -77,6 +77,10 @@ class UoI_L1Logistic(AbstractUoIGeneralizedLinearRegressor, LogisticRegression):
     standardize : bool
         If True, the regressors X will be standardized before regression by
         subtracting the mean and dividing by their standard deviations.
+    balance : bool
+        If True, the regressor will randomly resample the fitting bags as to 
+        balance the class distribution within each bag on both union and
+        interseciton steps.
     max_iter : int
         Maximum number of iterations for iterative fitting methods.
     tol : float
@@ -112,7 +116,7 @@ class UoI_L1Logistic(AbstractUoIGeneralizedLinearRegressor, LogisticRegression):
                  estimation_frac=0.9, n_C=48, stability_selection=1.,
                  estimation_score='acc', estimation_target=None,
                  multi_class='auto', shared_support=True, warm_start=False,
-                 eps=1e-5, fit_intercept=True, standardize=True,
+                 eps=1e-5, fit_intercept=True, standardize=True, balance=True,
                  max_iter=10000, tol=1e-3, random_state=None, comm=None,
                  logger=None):
         super(UoI_L1Logistic, self).__init__(
@@ -126,6 +130,7 @@ class UoI_L1Logistic(AbstractUoIGeneralizedLinearRegressor, LogisticRegression):
             random_state=random_state,
             fit_intercept=fit_intercept,
             standardize=standardize,
+            balance=balance,
             shared_support=shared_support,
             comm=comm,
             logger=logger)
