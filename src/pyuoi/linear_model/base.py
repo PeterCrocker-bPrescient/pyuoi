@@ -108,6 +108,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         self.shared_support = shared_support
         self.max_iter = max_iter
         self.tol = tol
+        #self.random_state = random_state
         self.comm = comm
         # preprocessing
         if isinstance(random_state, int):
@@ -117,7 +118,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             self.random_state = np.random.RandomState(random_state)
         else:
             if random_state is None:
-                self.random_state = np.random
+                self.random_state = np.random.RandomState()
             else:
                 self.random_state = random_state
 
