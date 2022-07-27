@@ -582,8 +582,8 @@ class UoI_Poisson(AbstractUoIGeneralizedLinearRegressor, Poisson):
 
         # Select the train data
         if boot_idxs is not None:
-            X = X[boot_idxs[self._estimation_target]]
-            y = y[boot_idxs[self._estimation_target]]
+            X = X[boot_idxs[self.estimation_target]]
+            y = y[boot_idxs[self.estimation_target]]
 
         # for Poisson, use predict_mean to calculate the "predicted" values
         y_pred = fitter.predict_mean(X[:, support])

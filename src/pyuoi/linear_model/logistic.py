@@ -134,6 +134,8 @@ class UoI_L1Logistic(AbstractUoIGeneralizedLinearRegressor, LogisticRegression):
             shared_support=shared_support,
             comm=comm,
             logger=logger)
+        self.warm_start = warm_start
+        self.max_iter = max_iter
         self.n_C = n_C
         self.Cs = None
         self.multi_class = multi_class

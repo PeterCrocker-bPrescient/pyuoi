@@ -128,7 +128,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
 
         self.n_supports_ = None
 
-        self._logger = check_logger(logger, 'uoi_linear_model', self.comm)
+        self.logger = check_logger(logger, 'uoi_linear_model', self.comm)
 
     @_abc.abstractproperty
     def estimation_score(self):
@@ -206,9 +206,9 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
             displaying progress.
         """
         if verbose:
-            self._logger.setLevel(logging.DEBUG)
+            self.logger.setLevel(logging.DEBUG)
         else:
-            self._logger.setLevel(logging.WARNING)
+            self.logger.setLevel(logging.WARNING)
 
         X, y = self._pre_fit(X, y)
 
@@ -306,10 +306,10 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
                 msg = ("selection bootstrap %d, "
                        "regularization parameter set %d"
                        % (boot_idx, reg_idx))
-                self._logger.info(msg)
+                self.logger.info(msg)
 
             else:
-                self._logger.info("selection bootstrap %d" % (boot_idx))
+                self.logger.info("selection bootstrap %d" % (boot_idx))
             selection_coefs[ii] = np.squeeze(
                 self.uoi_selection_sweep(X_rep, y_rep, my_reg_params))
 
@@ -337,7 +337,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
         self.n_supports_ = self.supports_.shape[0]
 
         if rank == 0:
-            self._logger.info("Found %d supports" % self.n_supports_)
+            self.logger.info("Found %d supports" % self.n_supports_)
 
         #####################
         # Estimation Module #
@@ -386,7 +386,7 @@ class AbstractUoILinearModel(SparseCoefMixin, metaclass=_abc.ABCMeta):
                  oversample = RandomOverSampler(random_state=self.random_state)
                  X_rep, y_rep = oversample.fit_resample(X_rep, y_rep)
 
-            self._logger.info("estimation bootstrap %d, support %d"
+            self.logger.info("estimation bootstrap %d, support %d"
                               % (boot_idx, support_idx))
             if np.any(support):
 
@@ -542,15 +542,16 @@ class AbstractUoILinearRegressor(AbstractUoILinearModel,
 
         self.__estimation_score = estimation_score
 
-        if estimation_target is not None:
-            if estimation_target not in ['train', 'test']:
-                raise ValueError(
-                    "invalid estimation target: %s" % estimation_target)
+        if estimation_target not in list(self._train_test_map.values()):
+            if estimation_target is not None:
+                if estimation_target not in list(self._train_test_map.keys()):
+                    raise ValueError(
+                        "invalid estimation target: %s" % estimation_target)
+                else:
+                    estimation_target = self._train_test_map[estimation_target]
             else:
-                estimation_target = self._train_test_map[estimation_target]
-        else:
-            estimation_target = self._default_est_targets[estimation_score]
-        self._estimation_target = estimation_target
+                estimation_target = self._default_est_targets[estimation_score]
+        self.estimation_target = estimation_target
 
     def _pre_fit(self, X, y):
         X, y = super()._pre_fit(X, y)
@@ -623,8 +624,8 @@ class AbstractUoILinearRegressor(AbstractUoILinearModel,
         """
 
         # Select the data relevant for the estimation_score
-        X = X[boot_idxs[self._estimation_target]]
-        y = y[boot_idxs[self._estimation_target]]
+        X = X[boot_idxs[self.estimation_target]]
+        y = y[boot_idxs[self.estimation_target]]
 
         if y.ndim == 2:
             if y.shape[1] > 1:
@@ -722,16 +723,16 @@ class AbstractUoIGeneralizedLinearRegressor(AbstractUoILinearModel,
                 "invalid estimation metric: '%s'" % estimation_score)
         self.__estimation_score = estimation_score
 
-        if estimation_target is not None:
-            if estimation_target not in ['train', 'test']:
-                raise ValueError(
-                    "invalid estimation target: %s" % estimation_target)
+        if estimation_target not in list(self._train_test_map.values()):
+            if estimation_target is not None:
+                if estimation_target not in list(self._train_test_map.keys()):
+                    raise ValueError(
+                        "invalid estimation target: %s" % estimation_target)
+                else:
+                    estimation_target = self._train_test_map[estimation_target]
             else:
-                estimation_target = self._train_test_map[estimation_target]
-        else:
-            estimation_target = self._default_est_targets[estimation_score]
-
-        self._estimation_target = estimation_target
+                estimation_target = self._default_est_targets[estimation_score]
+        self.estimation_target = estimation_target
 
     def _post_fit(self, X, y):
         super()._post_fit(X, y)
@@ -790,8 +791,8 @@ class AbstractUoIGeneralizedLinearRegressor(AbstractUoILinearModel,
         """
 
         # Select the data relevant for the estimation_score
-        X = X[boot_idxs[self._estimation_target]]
-        y = y[boot_idxs[self._estimation_target]]
+        X = X[boot_idxs[self.estimation_target]]
+        y = y[boot_idxs[self.estimation_target]]
 
         if metric == 'acc':
             if self.shared_support:
